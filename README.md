@@ -38,7 +38,7 @@ The dev binary uses `.accessory` activation (no Dock icon) without needing an ap
 - [x] **P0** — Package scaffold + runnable menu bar with native colored dots (demo data)
 - [x] **P1** — Core data layer: parse `~/.claude/sessions`, enumerate Ghostty via AppleScript, match windows ↔ sessions
 - [x] **P2** — Wire real data into the menu; click-to-focus by terminal UUID
-- [ ] **P3** — Live refresh (timer + FSEvents + on-open) and the model-judged done/waiting verdicts
+- [x] **P3** — Live refresh (30s timer + FSEvents on `~/.claude/sessions/` + fresh-on-open); model-judged done/waiting verdicts read from Stop-hook sidecars
 - [ ] **P4** — HTML report export + settings (refresh cadence, judging model)
 - [ ] **P5** — Packaged `.app`, signing, README demo, distribution
 - [ ] **Later** — abstract the terminal backend (iTerm2, WezTerm, …)
