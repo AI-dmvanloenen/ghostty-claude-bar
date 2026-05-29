@@ -15,13 +15,26 @@ enum Matcher {
     ) -> [Int: GhosttyTab] {
         guard !tabs.isEmpty, !sessions.isEmpty else { return [:] }
 
+        // IDF weight per title keyword: a word found in only one session's
+        // fingerprint ("mopo", "taste") is discriminative and should decide the
+        // match; a word in many ("ghostty", "claude", "report") is near-useless.
+        // Raw hit-counting let common words cross-assign sessions to the wrong
+        // window and drop others to "no match" — IDF weighting fixes that.
+        let n = Double(sessions.count)
+        let allKeywords = Set(tabs.flatMap { TextAnalysis.titleKeywords($0.title) })
+        var idf: [String: Double] = [:]
+        for kw in allKeywords {
+            let df = sessions.reduce(0) { $0 + ((fingerprints[$1.pid]?.contains(kw) == true) ? 1 : 0) }
+            idf[kw] = df == 0 ? 0 : log(1.0 + n / Double(df))
+        }
+
         // (score, tabIndex, pid), only positive scores.
-        var pairs: [(score: Int, tabIndex: Int, pid: Int)] = []
+        var pairs: [(score: Double, tabIndex: Int, pid: Int)] = []
         for (ti, tab) in tabs.enumerated() {
             let keywords = TextAnalysis.titleKeywords(tab.title)
             for s in sessions {
                 let fp = fingerprints[s.pid] ?? ""
-                let score = keywords.reduce(0) { $0 + (fp.contains($1) ? 1 : 0) }
+                let score = keywords.reduce(0.0) { $0 + (fp.contains($1) ? (idf[$1] ?? 0) : 0) }
                 if score > 0 { pairs.append((score, ti, s.pid)) }
             }
         }

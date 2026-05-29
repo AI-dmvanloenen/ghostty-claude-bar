@@ -12,7 +12,8 @@ let package = Package(
         // UI / menu-bar app. Owns nothing but presentation + AppKit glue.
         .executableTarget(
             name: "GhosttyClaudeBar",
-            dependencies: ["GhosttyClaudeBarCore"]
+            dependencies: ["GhosttyClaudeBarCore"],
+            resources: [.copy("Resources/Fonts")]
         ),
         // Pure data layer — no AppKit. This is where the Python tool's brains
         // (session parsing, Ghostty enumeration, fuzzy match, verdicts) get ported.

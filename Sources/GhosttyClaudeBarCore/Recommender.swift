@@ -19,14 +19,13 @@ public enum Recommender {
         let age = fmtAge(ageH)
         let hookVerdict = readVerdict(sessionId: session.sessionId)
 
+        // `busy` always means working — including while background agents / a
+        // workflow run (Claude Code keeps the session busy then, even though the
+        // main loop is quiet and the session file's updatedAt goes stale). A
+        // Notification verdict must NOT override this: notifications fire for
+        // noisy reasons (session-limit warnings, idle pings), and during long
+        // background work a stale WAITING would wrongly read as "needs reply".
         if session.status == "busy" {
-            // A fresh "waiting" event (Notification hook) means Claude is blocked
-            // on YOU mid-turn (e.g. a permission prompt) — that wins over busy.
-            // Stale once work resumes (session.updatedAt moves past the verdict).
-            if let v = hookVerdict, v.state == "WAITING",
-               v.ts >= session.updatedAt / 1000 - 2 {
-                return Verdict(state: .needsReply, reason: "waiting on you · needs input")
-            }
             return Verdict(state: .working, reason: "busy — working now")
         }
 

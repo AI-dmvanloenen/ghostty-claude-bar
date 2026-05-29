@@ -80,22 +80,30 @@ func heuristic() {
     #expect(Recommender.heuristicState(lastText: nil) == "ACTIVE")
 }
 
-@Test("a fresh WAITING verdict overrides busy (blocked on user mid-turn)")
-func waitingOverridesBusy() {
+@Test("busy always wins — even over a WAITING verdict (background agents / noisy notifications)")
+func busyAlwaysWins() {
     let sid = "gcb-unittest-busy-\(getpid())"
     defer { try? FileManager.default.removeItem(atPath: VerdictStore.path(for: sid)) }
 
     let now = Date()
-    // busy session, last activity 10s ago
     let s = Session(pid: 1, sessionId: sid, cwd: "/tmp/x", status: "busy",
                     startedAt: (now.timeIntervalSince1970 - 10) * 1000,
                     updatedAt: (now.timeIntervalSince1970 - 10) * 1000)
 
-    // fresh notification verdict (now) → should override busy
+    // Even a fresh WAITING (e.g. a session-limit Notification) must not flip a
+    // busy session — Claude stays busy while a workflow / background agents run.
     VerdictStore.write(sessionId: sid, state: "WAITING", ts: now.timeIntervalSince1970)
-    #expect(Recommender.recommend(session: s, lastText: nil, now: now).state == .needsReply)
-
-    // stale verdict (2 min ago) → busy wins again
-    VerdictStore.write(sessionId: sid, state: "WAITING", ts: now.timeIntervalSince1970 - 120)
     #expect(Recommender.recommend(session: s, lastText: nil, now: now).state == .working)
+}
+
+@Test("a WAITING verdict applies only when NOT busy")
+func waitingWhenIdle() {
+    let sid = "gcb-unittest-idle-\(getpid())"
+    defer { try? FileManager.default.removeItem(atPath: VerdictStore.path(for: sid)) }
+    let now = Date()
+    let s = Session(pid: 1, sessionId: sid, cwd: "/tmp/x", status: "idle",
+                    startedAt: (now.timeIntervalSince1970 - 600) * 1000,
+                    updatedAt: (now.timeIntervalSince1970 - 600) * 1000)
+    VerdictStore.write(sessionId: sid, state: "WAITING", ts: now.timeIntervalSince1970 - 600)
+    #expect(Recommender.recommend(session: s, lastText: nil, now: now).state == .needsReply)
 }

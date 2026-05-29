@@ -1,9 +1,10 @@
 import Foundation
 
-/// Orchestrates the whole survey: load sessions, enumerate Ghostty tabs, match
-/// them, and emit one `TabRow` per window (tab-centric — every window shows),
-/// with unmatched sessions appended so nothing is lost. This is the Swift port
-/// of the Python `build_rows`.
+/// Orchestrates the whole survey: load live Claude sessions, enumerate Ghostty
+/// tabs, and emit one row PER SESSION (session-centric). The Ghostty window is
+/// matched best-effort and used only for the title label + focus target — never
+/// for status — so an imperfect match can't show the wrong state. Windows with
+/// no live session are not shown.
 public enum Collector {
     /// Collect the current rows, sorted for display. Safe to call off the main
     /// thread (pure Foundation + subprocesses).
@@ -24,14 +25,18 @@ public enum Collector {
         TranscriptCache.shared.prune(livePaths: Set(sessions.compactMap(\.jsonlPath)))
         let fingerprints = scans.mapValues(\.fingerprint)
 
-        // pid → tab, then flip to terminalID → pid for tab-centric assembly.
+        // Best-effort window per session, used ONLY for the title label + the
+        // focus target. Status/cwd/tokens come from the session itself, so a
+        // wrong or missing window match can never corrupt what matters.
         let windowForPid = Matcher.matchWindows(tabs: tabs, sessions: sessions, fingerprints: fingerprints)
         var sessForTerm: [String: Int] = [:]
         for (pid, tab) in windowForPid { sessForTerm[tab.terminalID] = pid }
         Matcher.pairLeftovers(tabs: tabs, sessions: sessions, sessForTerm: &sessForTerm)
 
-        var sessionByPid: [Int: Session] = [:]
-        for s in sessions { sessionByPid[s.pid] = s }
+        var tabByTerm: [String: GhosttyTab] = [:]
+        for t in tabs { tabByTerm[t.terminalID] = t }
+        var tabForPid: [Int: GhosttyTab] = [:]
+        for (term, pid) in sessForTerm { if let t = tabByTerm[term] { tabForPid[pid] = t } }
 
         var tabsPerWindow: [Int: Int] = [:]
         for t in tabs { tabsPerWindow[t.window, default: 0] += 1 }
@@ -40,34 +45,16 @@ public enum Collector {
             return "W\(t.window)" + (multi ? "·T\(t.tab)" : "")
         }
 
-        var rows: [TabRow] = []
-        var matchedPids = Set<Int>()
-
-        for tab in tabs {
-            if let pid = sessForTerm[tab.terminalID], let session = sessionByPid[pid] {
-                matchedPids.insert(pid)
-                rows.append(row(from: session, scan: scans[pid], tab: tab, label: windowLabel(tab), now: now))
-            } else {
-                // A Ghostty window with no tracked Claude session (plain shell).
-                let stripped = TextAnalysis.stripLeadingGlyphs(tab.title)
-                rows.append(TabRow(
-                    id: "term-\(tab.terminalID)-\(tab.window)-\(tab.tab)",
-                    title: stripped.isEmpty ? "Terminal" : stripped,
-                    cwd: nil,
-                    ageText: nil,
-                    state: .other,
-                    reason: "no Claude session",
-                    terminalID: tab.terminalID,
-                    windowLabel: windowLabel(tab)
-                ))
-            }
+        // SESSION-CENTRIC: exactly one row per live Claude session. Windows with
+        // no live session are intentionally NOT shown — this tool is about
+        // sessions that need attention, and surfacing bare / ended-session
+        // terminals only produced confusing "ghost" rows. No session is ever
+        // dropped or duplicated, and status is always correct.
+        let rows = sessions.map { session -> TabRow in
+            let tab = tabForPid[session.pid]
+            return row(from: session, scan: scans[session.pid], tab: tab,
+                       label: tab.map(windowLabel) ?? "—", now: now)
         }
-
-        // Sessions that matched no tab — keep them (window "—").
-        for session in sessions where !matchedPids.contains(session.pid) {
-            rows.append(row(from: session, scan: scans[session.pid], tab: nil, label: "—", now: now))
-        }
-
         return sort(rows)
     }
 
