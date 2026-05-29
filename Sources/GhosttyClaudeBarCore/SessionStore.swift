@@ -25,7 +25,9 @@ public enum SessionStore {
         var sessions: [Session] = []
         for file in files where file.hasSuffix(".json") {
             let pidStem = String(file.dropLast(5))
-            guard let pid = Int(pidStem), live.contains(pid) else { continue }
+            guard let pid = Int(pidStem), live.contains(pid),
+                  !IgnoredPIDs.shared.contains(pid) // skip the judge's own claude -p
+            else { continue }
             let path = "\(Paths.sessionsDir)/\(file)"
             guard let data = fm.contents(atPath: path),
                   let d = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -23,7 +23,9 @@ enum Judge {
         var env = ProcessInfo.processInfo.environment
         env["GCB_JUDGE"] = "1" // recursion guard: our hook no-ops when it sees this
 
-        let out = (run(claude, ["-p", "--model", "haiku", prompt], env: env) ?? "").uppercased()
+        // `claude -p` creates a transient session file; register its PID so the
+        // collector doesn't flicker it in as a ghost row.
+        let out = (run(claude, ["-p", "--model", "haiku", prompt], env: env, registerPID: true) ?? "").uppercased()
         if out.contains("WAITING") { return "WAITING" }
         if out.contains("DONE") { return "DONE" }
         if out.contains("ACTIVE") { return "ACTIVE" }
@@ -54,7 +56,7 @@ enum Judge {
         return nil
     }
 
-    private static func run(_ launch: String, _ args: [String], env: [String: String]? = nil) -> String? {
+    private static func run(_ launch: String, _ args: [String], env: [String: String]? = nil, registerPID: Bool = false) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: launch)
         process.arguments = args
@@ -63,6 +65,11 @@ enum Judge {
         process.standardOutput = out
         process.standardError = Pipe()
         do { try process.run() } catch { return nil }
+
+        let pid = Int(process.processIdentifier)
+        if registerPID { IgnoredPIDs.shared.add(pid) }
+        defer { if registerPID { IgnoredPIDs.shared.remove(pid) } }
+
         let data = out.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         return String(data: data, encoding: .utf8)

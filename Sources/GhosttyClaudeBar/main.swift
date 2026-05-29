@@ -12,6 +12,16 @@ if CommandLine.arguments.contains("--notify-hook") {
     exit(0)
 }
 
+// Install / remove the Claude Code hooks in ~/.claude/settings.json.
+if CommandLine.arguments.contains("--install-hooks") {
+    print(HookInstaller.install())
+    exit(0)
+}
+if CommandLine.arguments.contains("--uninstall-hooks") {
+    print(HookInstaller.uninstall())
+    exit(0)
+}
+
 // Debug path: print the collected rows and exit (no GUI). Handy for verifying
 // the data layer against the real ~/.claude without launching the menu bar.
 if CommandLine.arguments.contains("--print") {
