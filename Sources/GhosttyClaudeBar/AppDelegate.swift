@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppIcon.install() // real Dock / Cmd-Tab icon (no bundled .icns in dev)
+
         let monitor = SessionMonitor(interval: AppSettings.refreshInterval)
         let reportWindow = ReportWindowController(monitor: monitor)
         let settingsWindow = SettingsWindowController(monitor: monitor)

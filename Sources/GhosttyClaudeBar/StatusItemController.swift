@@ -73,7 +73,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        addItem(to: menu, "Open report window", #selector(openReport), key: "o")
+        addItem(to: menu, "Open", #selector(openReport), key: "o")
         addItem(to: menu, "Refresh", #selector(refresh), key: "r")
         addItem(to: menu, "Settings…", #selector(openSettings), key: ",")
         menu.addItem(.separator())
