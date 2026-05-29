@@ -109,7 +109,10 @@ public enum GhosttyClient {
         Shell.run("/usr/bin/osascript", ["-e", script])
     }
 
-    /// Open a new Ghostty window and start `claude` in the given directory.
+    /// Open a new Ghostty window directly in `directory` and auto-run `claude`.
+    /// Uses a surface configuration so the shell starts in the right cwd (PATH
+    /// loads normally) and `claude` is run via `initial input` — no visible `cd`,
+    /// no Scratch detour.
     public static func newSession(directory: String) {
         let dir = directory
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -117,21 +120,13 @@ public enum GhosttyClient {
         let script = """
         tell application "Ghostty"
           activate
-          new window
-          delay 0.5
-          set tid to ""
-          try
-            set tid to id of (focused terminal of (selected tab of front window))
-          end try
-          if tid is not "" then
-            set theTerm to (first terminal whose id is tid)
-            input text "cd \\"\(dir)\\" && claude" to theTerm
-            delay 0.1
-            send key "enter" to theTerm
-          end if
+          set cfg to new surface configuration
+          set initial working directory of cfg to "\(dir)"
+          set initial input of cfg to ("claude" & return)
+          new window with configuration cfg
         end tell
         """
-        Shell.run("/usr/bin/osascript", ["-e", script], timeout: 10)
+        Shell.run("/usr/bin/osascript", ["-e", script], timeout: 8)
     }
 
     /// Terminal UUIDs are hex + dashes, 8–64 chars — never interpolate raw input.
