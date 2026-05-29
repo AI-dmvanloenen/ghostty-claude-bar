@@ -18,7 +18,11 @@ final class SettingsWindowController {
             window.title = "Settings"
             window.styleMask = [.titled, .closable, .fullSizeContentView]
             window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false
+            window.appearance = NSAppearance(named: .darkAqua)
+            window.backgroundColor = NSColor(red: 0x0E / 255, green: 0x10 / 255, blue: 0x14 / 255, alpha: 1)
             window.center()
             self.window = window
         }

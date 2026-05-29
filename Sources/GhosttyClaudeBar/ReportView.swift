@@ -1,69 +1,79 @@
 import SwiftUI
 import GhosttyClaudeBarCore
 
-/// The native report window: every live Claude Code session, grouped by state,
-/// with a colored accent, age, token/cost, last-message preview, and a focus
-/// action. Updates live from `SessionMonitor`.
+/// The native report window — a dark "mission control" surface listing every
+/// live Claude Code session, grouped by state, over an ambient glow that tracks
+/// the most urgent state. Updates live from `SessionMonitor`.
 struct ReportView: View {
     @ObservedObject var monitor: SessionMonitor
     /// Focus a Ghostty window by terminal UUID.
     var onFocus: (String) -> Void
 
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider().opacity(0.5)
-            content
-        }
-        .frame(minWidth: 580, minHeight: 440)
-        .background(WindowBackground())
+    private var dominant: Color {
+        StateStyle.dominantColor(for: monitor.rows.map(\.state))
     }
 
-    // MARK: Header
+    var body: some View {
+        ZStack(alignment: .top) {
+            AmbientBackground(accent: dominant)
+            VStack(spacing: 0) {
+                HeaderView(monitor: monitor)
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                content
+            }
+        }
+        .frame(minWidth: 600, minHeight: 460)
+        .preferredColorScheme(.dark)
+        .tint(dominant)
+    }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
+    @ViewBuilder private var content: some View {
+        if monitor.rows.isEmpty {
+            EmptyStateView().frame(maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 22) {
+                    ForEach(Array(monitor.grouped().enumerated()), id: \.element.state) { _, group in
+                        VStack(alignment: .leading, spacing: Theme.rowSpacing) {
+                            SectionHeaderView(state: group.state, count: group.rows.count)
+                            ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
+                                SessionRowView(row: row, index: index, onFocus: onFocus)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 22)
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+// MARK: - Header
+
+private struct HeaderView: View {
+    @ObservedObject var monitor: SessionMonitor
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 9) {
                 Text("Claude Code Sessions")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                summaryPills
+                    .font(Theme.display(20, .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                SummaryReadout(monitor: monitor)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                Button {
-                    monitor.refreshAsync()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-                .help("Refresh now")
+            VStack(alignment: .trailing, spacing: 8) {
+                RefreshButton { monitor.refreshAsync() }
                 Text(updatedText)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.mono(10))
+                    .foregroundStyle(Theme.textTertiary)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    private var summaryPills: some View {
-        HStack(spacing: 6) {
-            ForEach(monitor.grouped(), id: \.state) { group in
-                let style = StateStyle.of(group.state)
-                HStack(spacing: 4) {
-                    Circle().fill(style.color).frame(width: 7, height: 7)
-                    Text("\(group.rows.count)")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(style.color.opacity(0.12), in: Capsule())
-            }
-            if monitor.rows.isEmpty {
-                Text("no sessions").font(.caption).foregroundStyle(.tertiary)
-            }
-        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
     }
 
     private var updatedText: String {
@@ -73,46 +83,59 @@ struct ReportView: View {
         if secs < 60 { return "updated \(secs)s ago" }
         return "updated \(secs / 60)m ago"
     }
+}
 
-    // MARK: Content
+private struct SummaryReadout: View {
+    @ObservedObject var monitor: SessionMonitor
 
-    @ViewBuilder private var content: some View {
-        if monitor.rows.isEmpty {
-            emptyState
-        } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    ForEach(monitor.grouped(), id: \.state) { group in
-                        Section {
-                            VStack(spacing: 8) {
-                                ForEach(group.rows) { row in
-                                    SessionRowView(row: row, onFocus: onFocus)
-                                }
-                            }
-                        } header: {
-                            SectionHeaderView(state: group.state, count: group.rows.count)
-                        }
-                    }
+    var body: some View {
+        HStack(spacing: 5) {
+            if monitor.rows.isEmpty {
+                Text("no sessions")
+                    .font(Theme.mono(11))
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            ForEach(monitor.grouped(), id: \.state) { group in
+                let style = StateStyle.of(group.state)
+                HStack(spacing: 5) {
+                    StatusDot(style: style, size: 6)
+                    Text("\(group.rows.count)")
+                        .font(Theme.mono(11, .medium))
+                        .foregroundStyle(Theme.textSecondary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(style.color.opacity(0.12))
+                        .overlay(Capsule().strokeBorder(style.color.opacity(0.25), lineWidth: 0.5))
+                )
             }
         }
     }
+}
 
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "macwindow.on.rectangle")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.tertiary)
-            Text("No open Ghostty windows")
-                .font(.headline).foregroundStyle(.secondary)
-            Text("Open a Ghostty window running Claude Code and it'll show up here.")
-                .font(.caption).foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
+private struct RefreshButton: View {
+    let action: () -> Void
+    @State private var hovering = false
+    @State private var spin = false
+
+    var body: some View {
+        Button {
+            spin.toggle()
+            action()
+        } label: {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Theme.card))
+                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+                .rotationEffect(.degrees(spin ? 360 : 0))
+                .animation(.easeInOut(duration: 0.6), value: spin)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Refresh now")
     }
 }
 
@@ -124,20 +147,23 @@ private struct SectionHeaderView: View {
 
     var body: some View {
         let style = StateStyle.of(state)
-        HStack(spacing: 7) {
+        HStack(spacing: 8) {
             Image(systemName: style.symbol)
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(style.color)
             Text(style.label.uppercased())
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
+                .font(Theme.display(10, .bold))
+                .tracking(1.2)
+                .foregroundStyle(Theme.textSecondary)
             Text("\(count)")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(.tertiary)
-            Spacer()
+                .font(Theme.mono(10, .semibold))
+                .foregroundStyle(Theme.textTertiary)
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(height: 1)
+                .padding(.leading, 4)
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 1)
     }
 }
 
@@ -145,60 +171,74 @@ private struct SectionHeaderView: View {
 
 private struct SessionRowView: View {
     let row: TabRow
+    let index: Int
     var onFocus: (String) -> Void
+
     @State private var hovering = false
+    @State private var appeared = false
 
     private var style: StateStyle { StateStyle.of(row.state) }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            Rectangle().fill(style.color).frame(width: 3).opacity(0.9)
+        HStack(alignment: .top, spacing: 13) {
+            StatusDot(style: style, size: 9)
+                .padding(.top, 3)
             details
             focusGlyph
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(rowBackground)
+        .overlay(accentEdge, alignment: .leading)
         .overlay(rowBorder)
-        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: .black.opacity(hovering ? 0.35 : 0), radius: hovering ? 10 : 0, y: hovering ? 4 : 0)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { if let id = row.terminalID { onFocus(id) } }
         .help(row.terminalID != nil ? "Click to focus this Ghostty window" : "No window to focus")
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 8)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.35).delay(Double(index) * 0.045)) {
+                appeared = true
+            }
+        }
     }
 
     private var details: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             titleRow
             metaRow
             if let reason = row.reason {
                 Text(reason)
-                    .font(.system(size: 11))
-                    .foregroundStyle(style.color.opacity(0.95))
+                    .font(Theme.text(11, .medium))
+                    .foregroundStyle(style.color)
                     .lineLimit(1)
             }
             if let last = row.lastMessage, !last.isEmpty {
                 Text(last)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .font(Theme.text(11))
+                    .foregroundStyle(Theme.textTertiary)
                     .lineLimit(2)
                     .padding(.top, 1)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 
     private var titleRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(row.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Theme.display(13.5, .semibold))
+                .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 8)
             if let age = row.ageText {
                 Text(age)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(.quaternary.opacity(0.6), in: Capsule())
+                    .font(Theme.mono(10, .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 7).padding(.vertical, 2.5)
+                    .background(Capsule().fill(Theme.cardRaised))
             }
         }
     }
@@ -206,55 +246,71 @@ private struct SessionRowView: View {
     @ViewBuilder private var metaRow: some View {
         HStack(spacing: 8) {
             if let cwd = row.cwd, !cwd.isEmpty {
-                Label(cwd, systemImage: "folder")
-                    .labelStyle(.titleAndIcon)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Image(systemName: "folder").font(.system(size: 9))
+                    Text(cwd).font(Theme.mono(10))
+                }
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
             }
             if let win = row.windowLabel {
-                Text(win)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                Text(win).font(Theme.mono(9, .medium)).foregroundStyle(Theme.textTertiary)
             }
             if let tokens = row.tokensText {
-                Text("·").foregroundStyle(.tertiary)
-                Text(tokens + (row.costText.map { "  \($0)" } ?? ""))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                Text("·").foregroundStyle(Theme.textTertiary)
+                Text(tokens).font(Theme.mono(9)).foregroundStyle(Theme.textTertiary)
+                if let cost = row.costText {
+                    Text(cost).font(Theme.mono(9, .medium)).foregroundStyle(style.color.opacity(0.85))
+                }
             }
         }
     }
 
     @ViewBuilder private var focusGlyph: some View {
         if row.terminalID != nil {
-            Image(systemName: "arrow.up.forward.app")
+            Image(systemName: "arrow.up.forward.app.fill")
                 .font(.system(size: 13))
-                .foregroundStyle(hovering ? style.color : Color.secondary)
-                .padding(.trailing, 12)
-                .padding(.top, 11)
+                .foregroundStyle(hovering ? style.color : Theme.textTertiary.opacity(0.5))
+                .padding(.top, 2)
         }
     }
 
     private var rowBackground: some View {
-        RoundedRectangle(cornerRadius: 9)
-            .fill(hovering ? style.color.opacity(0.10) : Color.primary.opacity(0.04))
+        RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+            .fill(hovering ? style.color.opacity(0.10) : Theme.card)
+    }
+
+    private var accentEdge: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(style.color)
+            .frame(width: 3)
+            .shadow(color: style.color.opacity(0.7), radius: hovering ? 4 : 2)
+            .padding(.vertical, 6)
     }
 
     private var rowBorder: some View {
-        RoundedRectangle(cornerRadius: 9)
-            .strokeBorder(hovering ? style.color.opacity(0.35) : Color.clear, lineWidth: 1)
+        RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+            .strokeBorder(hovering ? style.color.opacity(0.4) : Theme.hairline, lineWidth: 1)
     }
 }
 
-/// Subtle adaptive window backing.
-private struct WindowBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = .underWindowBackground
-        v.blendingMode = .behindWindow
-        v.state = .active
-        return v
+// MARK: - Empty state
+
+private struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "macwindow.on.rectangle")
+                .font(.system(size: 42, weight: .ultraLight))
+                .foregroundStyle(Theme.textTertiary)
+            Text("No open Ghostty windows")
+                .font(Theme.display(15, .medium))
+                .foregroundStyle(Theme.textSecondary)
+            Text("Open a Ghostty window running Claude Code\nand it'll show up here.")
+                .font(Theme.text(11))
+                .foregroundStyle(Theme.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(40)
     }
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
