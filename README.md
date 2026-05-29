@@ -40,6 +40,7 @@ The dev binary uses `.accessory` activation (no Dock icon) without needing an ap
 - [x] **P2** — Wire real data into the menu; click-to-focus by terminal UUID
 - [x] **P3** — Live refresh (30s timer + FSEvents on `~/.claude/sessions/` + fresh-on-open); model-judged done/waiting verdicts read from Stop-hook sidecars
 - [x] **P4** — Native SwiftUI report window (sessions grouped by state, age, token/cost, last-message preview, click-to-focus) + live Settings (refresh cadence)
+- [x] **Status engine** — event-driven via Claude Code hooks (Stop + Notification), instant heuristic verdict refined by Haiku (`claude` CLI, no API key), `busy`-override for mid-turn blocks; incremental transcript caching + coalesced refresh for low overhead. *(Hook registration ships with P5 install.)*
 - [ ] **P5** — Packaged `.app`, signing, README demo, distribution
 - [ ] **Later** — abstract the terminal backend (iTerm2, WezTerm, …)
 
