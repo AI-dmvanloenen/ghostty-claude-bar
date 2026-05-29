@@ -24,6 +24,17 @@ public struct TabRow: Sendable, Identifiable {
     /// Stable Ghostty terminal UUID, used to focus the window. nil for orphan rows.
     public let terminalID: String?
 
+    // Richer fields for the report window (the menu uses only the above).
+    /// "W3" or "W3·T2" for multi-tab windows; "—" for orphan sessions; nil for shells.
+    public let windowLabel: String?
+    public let pid: Int?
+    public let status: String?
+    public let tokens: Int
+    public let tokensText: String?
+    public let costText: String?
+    /// First line of the last assistant message, for a preview.
+    public let lastMessage: String?
+
     public init(
         id: String,
         title: String,
@@ -31,7 +42,14 @@ public struct TabRow: Sendable, Identifiable {
         ageText: String? = nil,
         state: SessionState,
         reason: String? = nil,
-        terminalID: String? = nil
+        terminalID: String? = nil,
+        windowLabel: String? = nil,
+        pid: Int? = nil,
+        status: String? = nil,
+        tokens: Int = 0,
+        tokensText: String? = nil,
+        costText: String? = nil,
+        lastMessage: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -40,6 +58,13 @@ public struct TabRow: Sendable, Identifiable {
         self.state = state
         self.reason = reason
         self.terminalID = terminalID
+        self.windowLabel = windowLabel
+        self.pid = pid
+        self.status = status
+        self.tokens = tokens
+        self.tokensText = tokensText
+        self.costText = costText
+        self.lastMessage = lastMessage
     }
 
     /// Title as shown in the menu. Age is appended inline for now; Phase 2 will

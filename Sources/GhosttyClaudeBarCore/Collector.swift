@@ -41,15 +41,16 @@ public enum Collector {
                 rows.append(row(from: session, tab: tab, label: windowLabel(tab), now: now))
             } else {
                 // A Ghostty window with no tracked Claude session (plain shell).
+                let stripped = TextAnalysis.stripLeadingGlyphs(tab.title)
                 rows.append(TabRow(
                     id: "term-\(tab.terminalID)-\(tab.window)-\(tab.tab)",
-                    title: TextAnalysis.stripLeadingGlyphs(tab.title).isEmpty
-                        ? "Terminal" : TextAnalysis.stripLeadingGlyphs(tab.title),
+                    title: stripped.isEmpty ? "Terminal" : stripped,
                     cwd: nil,
                     ageText: nil,
                     state: .other,
                     reason: "no Claude session",
-                    terminalID: tab.terminalID
+                    terminalID: tab.terminalID,
+                    windowLabel: windowLabel(tab)
                 ))
             }
         }
@@ -66,6 +67,7 @@ public enum Collector {
         let lastText = TextAnalysis.lastAssistantText(jsonlPath: session.jsonlPath)
         let verdict = Recommender.recommend(session: session, lastText: lastText, now: now)
         let ageH = session.ageHours(now: now)
+        let usage = Usage.summarize(jsonlPath: session.jsonlPath)
 
         let title: String
         if let tab {
@@ -75,14 +77,23 @@ public enum Collector {
             title = base.isEmpty ? "session" : base
         }
 
+        let preview = lastText.map { String($0.split(separator: "\n").first ?? "").trimmingCharacters(in: .whitespaces) }
+
         return TabRow(
             id: "pid-\(session.pid)",
-            title: title,
+            title: title.isEmpty ? "session" : title,
             cwd: Paths.collapseHome(session.cwd),
             ageText: session.updatedAt != 0 || session.startedAt != 0 ? Recommender.fmtAge(ageH) : nil,
             state: verdict.state,
             reason: verdict.reason,
-            terminalID: tab?.terminalID
+            terminalID: tab?.terminalID,
+            windowLabel: label,
+            pid: session.pid,
+            status: session.status,
+            tokens: usage.tokens,
+            tokensText: usage.tokens > 0 ? Usage.fmtTokens(usage.tokens) : nil,
+            costText: usage.tokens > 0 ? Usage.fmtCost(usage) : nil,
+            lastMessage: (preview?.isEmpty ?? true) ? nil : preview
         )
     }
 

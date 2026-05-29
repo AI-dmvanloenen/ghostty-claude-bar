@@ -1,28 +1,24 @@
 import AppKit
 import GhosttyClaudeBarCore
 
-/// Owns the `NSStatusItem` and builds its dropdown menu from `[TabRow]`.
+/// Owns the `NSStatusItem` and builds its dropdown from `SessionMonitor`.
 ///
-/// Mirrors the proven SwiftBar UX: one line per Ghostty window, rows pre-sorted
-/// working → needs-reply → idle → safe-to-close → other so colors cluster,
-/// cwd in the tooltip, a single separator before the footer actions.
-///
-/// Refresh model (P3): the menu is rebuilt **synchronously on open** via
-/// `NSMenuDelegate.menuNeedsUpdate` so it's always current. A 30s timer and an
-/// FSEvents watcher on `~/.claude/sessions/` keep the menu-bar **icon** (count +
-/// glyph) live in the background while the menu is closed.
+/// The menu rebuilds synchronously on open (`menuNeedsUpdate`) so it's always
+/// current; the icon repaints whenever the monitor refreshes (its `onUpdate`).
+/// All refresh scheduling lives in the monitor, not here.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let renderer = IconRenderer()
     private let menu = NSMenu()
+    private let monitor: SessionMonitor
+    private let onOpenReport: () -> Void
+    private let onOpenSettings: () -> Void
 
-    private var timer: Timer?
-    private var watcher: FSEventsWatcher?
-
-    private static let refreshInterval: TimeInterval = 30
-
-    override init() {
+    init(monitor: SessionMonitor, onOpenReport: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
+        self.monitor = monitor
+        self.onOpenReport = onOpenReport
+        self.onOpenSettings = onOpenSettings
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -33,54 +29,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.imagePosition = .imageLeading
         }
 
-        refreshIcon()        // initial async icon fill
-        startBackgroundRefresh()
+        monitor.onUpdate = { [weak self] m in self?.applyIcon(m) }
     }
 
-    // MARK: - Background icon refresh (menu closed)
-
-    private func startBackgroundRefresh() {
-        let timer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshIcon() }
-        }
-        self.timer = timer
-
-        let watcher = FSEventsWatcher(path: Paths.sessionsDir) { [weak self] in
-            MainActor.assumeIsolated { self?.refreshIcon() }
-        }
-        watcher.start()
-        self.watcher = watcher
-    }
-
-    /// Recompute rows off-main and update only the menu-bar button (count + glyph).
-    /// Cheap enough to run on every FSEvents tick; never blocks the menu.
-    private func refreshIcon() {
-        Task.detached(priority: .utility) {
-            let rows = Collector.collect()
-            await MainActor.run { self.applyIcon(rows) }
-        }
-    }
-
-    private func applyIcon(_ rows: [TabRow]) {
-        let needsReply = rows.contains { $0.state == .needsReply }
+    private func applyIcon(_ monitor: SessionMonitor) {
         guard let button = statusItem.button else { return }
-        button.image = renderer.statusBarImage(needsReply: needsReply)
+        button.image = renderer.statusBarImage(needsReply: monitor.needsReply)
         button.imagePosition = .imageLeading
-        button.title = " \(rows.count)"
-        if ProcessInfo.processInfo.environment["GCB_DEBUG"] != nil {
-            NSLog("[ghostty-claude-bar] refresh → \(rows.count) rows, needsReply=\(needsReply)")
-        }
+        button.title = " \(monitor.rows.count)"
     }
 
     // MARK: - NSMenuDelegate (fresh-on-open)
 
-    /// Called right before the menu is shown — collect synchronously so the
-    /// dropdown always reflects the current instant. AppleScript + file reads are
-    /// ~100ms; a brief, one-shot cost only when you actually open the menu.
     func menuNeedsUpdate(_ menu: NSMenu) {
-        let rows = Collector.collect()
+        let rows = monitor.refreshSync()
         populate(menu, with: rows)
-        applyIcon(rows)
     }
 
     private func populate(_ menu: NSMenu, with rows: [TabRow]) {
@@ -100,23 +63,23 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.image = renderer.dotImage(for: row.state)
             item.toolTip = [row.cwd, row.reason].compactMap { $0 }.joined(separator: " — ")
             item.representedObject = row.terminalID
-            item.isEnabled = row.terminalID != nil // orphan sessions can't be focused
+            item.isEnabled = row.terminalID != nil
             menu.addItem(item)
         }
 
         menu.addItem(.separator())
 
-        let refresh = NSMenuItem(title: "Refresh", action: #selector(refresh), keyEquivalent: "r")
-        refresh.target = self
-        menu.addItem(refresh)
+        addItem(to: menu, "Open report window", #selector(openReport), key: "o")
+        addItem(to: menu, "Refresh", #selector(refresh), key: "r")
+        addItem(to: menu, "Settings…", #selector(openSettings), key: ",")
+        menu.addItem(.separator())
+        addItem(to: menu, "Quit ghostty-claude-bar", #selector(quit), key: "q")
+    }
 
-        let report = NSMenuItem(title: "Open full report", action: #selector(openReport), keyEquivalent: "")
-        report.target = self
-        menu.addItem(report)
-
-        let quit = NSMenuItem(title: "Quit ghostty-claude-bar", action: #selector(quit), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
+    private func addItem(to menu: NSMenu, _ title: String, _ action: Selector, key: String) {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        menu.addItem(item)
     }
 
     // MARK: - Actions
@@ -126,16 +89,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         Task.detached { GhosttyClient.focus(terminalID: uuid) }
     }
 
-    @objc private func refresh() {
-        refreshIcon()
-    }
-
-    @objc private func openReport() {
-        // Phase 4: render the HTML report and open it.
-        NSLog("[ghostty-claude-bar] open full report (Phase 4)")
-    }
-
-    @objc private func quit() {
-        NSApp.terminate(nil)
-    }
+    @objc private func refresh() { monitor.refreshAsync() }
+    @objc private func openReport() { onOpenReport() }
+    @objc private func openSettings() { onOpenSettings() }
+    @objc private func quit() { NSApp.terminate(nil) }
 }
