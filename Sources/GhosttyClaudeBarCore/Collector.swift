@@ -88,6 +88,7 @@ public enum Collector {
             tokens: usage.tokens,
             tokensText: usage.tokens > 0 ? Usage.fmtTokens(usage.tokens) : nil,
             costText: usage.tokens > 0 ? Usage.fmtCost(usage) : nil,
+            costUSD: usage.cost,
             lastMessage: (preview?.isEmpty ?? true) ? nil : preview
         )
     }

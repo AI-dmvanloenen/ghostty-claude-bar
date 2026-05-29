@@ -22,6 +22,14 @@ if CommandLine.arguments.contains("--uninstall-hooks") {
     exit(0)
 }
 
+// Debug: list registered custom font families and exit.
+if CommandLine.arguments.contains("--fonts") {
+    FontLoader.registerBundledFonts()
+    print("Martian: \(FontLoader.families(matching: "martian"))")
+    print("Plex:    \(FontLoader.families(matching: "plex"))")
+    exit(0)
+}
+
 // Debug path: print the collected rows and exit (no GUI). Handy for verifying
 // the data layer against the real ~/.claude without launching the menu bar.
 if CommandLine.arguments.contains("--print") {
@@ -41,6 +49,8 @@ if CommandLine.arguments.contains("--print") {
     print("— \(rows.count) row(s)")
     exit(0)
 }
+
+FontLoader.registerBundledFonts()
 
 // Menu-bar agent app. `.accessory` keeps it out of the Dock and the app
 // switcher even when launched via `swift run` (no bundle / Info.plist needed

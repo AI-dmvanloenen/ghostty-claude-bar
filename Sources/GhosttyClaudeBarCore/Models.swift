@@ -32,6 +32,7 @@ public struct TabRow: Sendable, Identifiable {
     public let tokens: Int
     public let tokensText: String?
     public let costText: String?
+    public let costUSD: Double?
     /// First line of the last assistant message, for a preview.
     public let lastMessage: String?
 
@@ -49,6 +50,7 @@ public struct TabRow: Sendable, Identifiable {
         tokens: Int = 0,
         tokensText: String? = nil,
         costText: String? = nil,
+        costUSD: Double? = nil,
         lastMessage: String? = nil
     ) {
         self.id = id
@@ -64,6 +66,7 @@ public struct TabRow: Sendable, Identifiable {
         self.tokens = tokens
         self.tokensText = tokensText
         self.costText = costText
+        self.costUSD = costUSD
         self.lastMessage = lastMessage
     }
 

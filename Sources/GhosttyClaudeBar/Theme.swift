@@ -16,15 +16,18 @@ enum Theme {
     static let textSecondary = Color(hex: 0x97A0AD)
     static let textTertiary  = Color(hex: 0x5B6573)
 
-    // Type — rounded display, monospaced telemetry.
+    // Type — bundled signature faces (registered at launch by FontLoader).
+    // Martian Mono: condensed, blocky, "mission control" display face for the
+    // title + section labels. IBM Plex Mono: the telemetry/body face. Both fall
+    // back to the system equivalent if registration ever fails.
     static func display(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .custom("Martian Mono", size: size).weight(weight)
     }
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+        .custom("IBM Plex Mono", size: size).weight(weight)
     }
     static func text(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+        .custom("IBM Plex Mono", size: size).weight(weight)
     }
 
     // Geometry

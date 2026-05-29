@@ -44,6 +44,13 @@ The dev binary uses `.accessory` activation (no Dock icon) without needing an ap
 - [ ] **P5** — Packaged `.app`, signing, README demo, distribution
 - [ ] **Later** — abstract the terminal backend (iTerm2, WezTerm, …)
 
+## Fonts
+
+Bundles two OFL fonts for its typographic signature:
+[Martian Mono](https://github.com/evilmartians/mono) (display) and
+[IBM Plex Mono](https://github.com/IBM/plex) (telemetry). Licenses in
+`Sources/GhosttyClaudeBar/Resources/Fonts/`.
+
 ## License
 
 MIT © 2026 Douwe van Loenen

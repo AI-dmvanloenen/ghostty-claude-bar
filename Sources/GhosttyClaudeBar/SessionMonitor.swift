@@ -93,4 +93,9 @@ final class SessionMonitor: ObservableObject {
     }
 
     var needsReply: Bool { rows.contains { $0.state == .needsReply } }
+
+    /// Aggregate token + cost totals across all sessions (for the header readout).
+    var totalTokens: Int { rows.reduce(0) { $0 + $1.tokens } }
+    var totalCost: Double { rows.reduce(0) { $0 + ($1.costUSD ?? 0) } }
+    var maxTokens: Int { rows.map(\.tokens).max() ?? 0 }
 }
