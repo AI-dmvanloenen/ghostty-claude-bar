@@ -72,12 +72,7 @@ public enum GhosttyClient {
     /// Focus the window owning a terminal, by its stable UUID. Window indices are
     /// unstable (Ghostty reorders on focus), so we always target the id.
     public static func focus(terminalID: String) {
-        // Validate: hex + dashes only, 8–64 chars — never interpolate raw input.
-        let allowed = CharacterSet(charactersIn: "0123456789abcdefABCDEF-")
-        guard (8...64).contains(terminalID.count),
-              terminalID.unicodeScalars.allSatisfy(allowed.contains)
-        else { return }
-
+        guard isValidID(terminalID) else { return }
         let script = """
         tell application "Ghostty"
           activate
@@ -88,5 +83,30 @@ public enum GhosttyClient {
         end tell
         """
         Shell.run("/usr/bin/osascript", ["-e", script])
+    }
+
+    /// Type text into a terminal (Ghostty's `input text` command, added in newer
+    /// versions — verified in the sdef). `submit` appends a return so it's sent
+    /// as a command. Used to fire `/close` into a session from the dashboard.
+    public static func sendText(_ text: String, toTerminal id: String, submit: Bool = true) {
+        guard isValidID(id) else { return }
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let expr = submit ? "(\"\(escaped)\" & return)" : "\"\(escaped)\""
+        let script = """
+        tell application "Ghostty"
+          try
+            input text \(expr) to (first terminal whose id is "\(id)")
+          end try
+        end tell
+        """
+        Shell.run("/usr/bin/osascript", ["-e", script])
+    }
+
+    /// Terminal UUIDs are hex + dashes, 8–64 chars — never interpolate raw input.
+    private static func isValidID(_ id: String) -> Bool {
+        let allowed = CharacterSet(charactersIn: "0123456789abcdefABCDEF-")
+        return (8...64).contains(id.count) && id.unicodeScalars.allSatisfy(allowed.contains)
     }
 }

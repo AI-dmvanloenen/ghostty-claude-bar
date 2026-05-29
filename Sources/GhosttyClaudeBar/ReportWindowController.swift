@@ -16,9 +16,16 @@ final class ReportWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         if window == nil {
-            let view = ReportView(monitor: monitor) { uuid in
-                Task.detached { GhosttyClient.focus(terminalID: uuid) }
-            }
+            let view = ReportView(
+                monitor: monitor,
+                onFocus: { uuid in Task.detached { GhosttyClient.focus(terminalID: uuid) } },
+                onClose: { uuid in
+                    Task.detached {
+                        GhosttyClient.focus(terminalID: uuid)
+                        GhosttyClient.sendText("/close", toTerminal: uuid)
+                    }
+                }
+            )
             let hosting = NSHostingController(rootView: view)
             let window = NSWindow(contentViewController: hosting)
             window.title = "Claude Code Sessions"

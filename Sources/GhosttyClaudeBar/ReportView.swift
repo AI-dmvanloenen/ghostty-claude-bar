@@ -8,6 +8,7 @@ import GhosttyClaudeBarCore
 struct ReportView: View {
     @ObservedObject var monitor: SessionMonitor
     var onFocus: (String) -> Void
+    var onClose: (String) -> Void
 
     private var dominant: Color {
         StateStyle.dominantColor(for: monitor.rows.map(\.state))
@@ -40,7 +41,7 @@ struct ReportView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             SectionHeaderView(state: group.state, count: group.rows.count)
                             ForEach(group.rows) { row in
-                                SessionRowView(row: row, onFocus: onFocus)
+                                SessionRowView(row: row, onFocus: onFocus, onClose: onClose)
                                     .transition(.asymmetric(
                                         insertion: .opacity.combined(with: .move(edge: .top)),
                                         removal: .opacity))
@@ -186,6 +187,7 @@ private struct SectionHeaderView: View {
 private struct SessionRowView: View {
     let row: TabRow
     var onFocus: (String) -> Void
+    var onClose: (String) -> Void
 
     @State private var hovering = false
 
@@ -197,7 +199,7 @@ private struct SessionRowView: View {
             AccentEdge(color: style.color, live: style.isLive)
             StatusDot(style: style, size: 9).padding(.top, 2)
             details
-            focusGlyph
+            actions
         }
         .padding(.leading, 0)
         .padding(.trailing, 14)
@@ -270,13 +272,26 @@ private struct SessionRowView: View {
         }
     }
 
-    @ViewBuilder private var focusGlyph: some View {
-        if row.terminalID != nil {
-            Image(systemName: "arrow.up.forward.app.fill")
-                .font(.system(size: 13))
-                .foregroundStyle(hovering ? style.color : Theme.textTertiary.opacity(0.5))
-                .padding(.top, 2)
+    @ViewBuilder private var actions: some View {
+        HStack(spacing: 10) {
+            // Close button — only when hovering and NOT working (don't interrupt
+            // an active turn). Sends `/close` into the session via Ghostty.
+            if hovering, let id = row.terminalID, row.state != .working {
+                Button { onClose(id) } label: {
+                    Image(systemName: "stop.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(hex: 0x5FD08A))
+                }
+                .buttonStyle(.plain)
+                .help("Run /close in this session (wrap up + close the tab)")
+            }
+            if row.terminalID != nil {
+                Image(systemName: "arrow.up.forward.app.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(hovering ? style.color : Theme.textTertiary.opacity(0.5))
+            }
         }
+        .padding(.top, 2)
     }
 
     private var rowBackground: some View {
