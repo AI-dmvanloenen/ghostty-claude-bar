@@ -40,7 +40,7 @@ struct ReportView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             SectionHeaderView(state: group.state, count: group.rows.count)
                             ForEach(group.rows) { row in
-                                SessionRowView(row: row, maxTokens: monitor.maxTokens, onFocus: onFocus)
+                                SessionRowView(row: row, onFocus: onFocus)
                                     .transition(.asymmetric(
                                         insertion: .opacity.combined(with: .move(edge: .top)),
                                         removal: .opacity))
@@ -85,7 +85,7 @@ private struct HeaderView: View {
             VStack(alignment: .trailing, spacing: 8) {
                 RefreshButton { monitor.refreshAsync() }
                 Text(updatedText)
-                    .font(Theme.mono(10))
+                    .font(Theme.mono(11))
                     .foregroundStyle(Theme.textTertiary)
             }
         }
@@ -111,23 +111,21 @@ private struct StatusStrip: View {
     var body: some View {
         HStack(spacing: 9) {
             if monitor.rows.isEmpty {
-                Text("no live sessions").font(Theme.mono(11)).foregroundStyle(Theme.textTertiary)
+                Text("no live sessions").font(Theme.mono(12)).foregroundStyle(Theme.textTertiary)
             } else {
                 ForEach(monitor.grouped(), id: \.state) { group in
                     let style = StateStyle.of(group.state)
                     HStack(spacing: 5) {
-                        StatusDot(style: style, size: 6)
+                        StatusDot(style: style, size: 7)
                         Text("\(group.rows.count)")
-                            .font(Theme.mono(11, .medium))
+                            .font(Theme.mono(12, .medium))
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
                 if monitor.totalTokens > 0 {
-                    Rectangle().fill(Theme.hairline).frame(width: 1, height: 11)
+                    Rectangle().fill(Theme.hairline).frame(width: 1, height: 12)
                     Text("↓ \(Usage.fmtTokens(monitor.totalTokens))")
-                        .font(Theme.mono(11)).foregroundStyle(Theme.textTertiary)
-                    Text("$\(String(format: "%.0f", monitor.totalCost))")
-                        .font(Theme.mono(11, .medium)).foregroundStyle(Theme.textSecondary)
+                        .font(Theme.mono(12)).foregroundStyle(Theme.textTertiary)
                 }
             }
         }
@@ -168,14 +166,14 @@ private struct SectionHeaderView: View {
         let style = StateStyle.of(state)
         HStack(spacing: 8) {
             Image(systemName: style.symbol)
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(style.color)
             Text(style.label.uppercased())
-                .font(Theme.display(9.5, .semibold))
+                .font(Theme.display(11, .semibold))
                 .tracking(1.0)
                 .foregroundStyle(Theme.textSecondary)
             Text("\(count)")
-                .font(Theme.mono(9.5, .medium))
+                .font(Theme.mono(10.5, .medium))
                 .foregroundStyle(Theme.textTertiary)
             Rectangle().fill(Theme.hairline).frame(height: 1).padding(.leading, 4)
         }
@@ -187,7 +185,6 @@ private struct SectionHeaderView: View {
 
 private struct SessionRowView: View {
     let row: TabRow
-    let maxTokens: Int
     var onFocus: (String) -> Void
 
     @State private var hovering = false
@@ -221,14 +218,13 @@ private struct SessionRowView: View {
             metaRow
             if let reason = row.reason {
                 Text(reason)
-                    .font(Theme.mono(10.5, .medium))
+                    .font(Theme.mono(12, .medium))
                     .foregroundStyle(style.color)
                     .lineLimit(1)
             }
-            tokenBar
             if let last = row.lastMessage, !last.isEmpty {
                 Text(last)
-                    .font(Theme.text(10.5))
+                    .font(Theme.text(11.5))
                     .foregroundStyle(Theme.textTertiary)
                     .lineLimit(prominent ? 2 : 1)
                     .padding(.top, 1)
@@ -240,13 +236,13 @@ private struct SessionRowView: View {
     private var titleRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(row.title)
-                .font(Theme.mono(prominent ? 13 : 12.5, .semibold))
+                .font(Theme.mono(prominent ? 14.5 : 13.5, .semibold))
                 .foregroundStyle(prominent ? Theme.textPrimary : Theme.textPrimary.opacity(0.92))
                 .lineLimit(1)
             Spacer(minLength: 8)
             if let age = row.ageText {
                 Text(age)
-                    .font(Theme.mono(10, .medium))
+                    .font(Theme.mono(11, .medium))
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 7).padding(.vertical, 2.5)
                     .background(Capsule().fill(Theme.cardRaised))
@@ -258,36 +254,19 @@ private struct SessionRowView: View {
         HStack(spacing: 8) {
             if let cwd = row.cwd, !cwd.isEmpty {
                 HStack(spacing: 4) {
-                    Image(systemName: "folder").font(.system(size: 9))
-                    Text(cwd).font(Theme.mono(10))
+                    Image(systemName: "folder").font(.system(size: 10))
+                    Text(cwd).font(Theme.mono(11.5))
                 }
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
             }
             if let win = row.windowLabel, win != "—" {
-                Text(win).font(Theme.mono(9, .medium)).foregroundStyle(Theme.textTertiary)
+                Text(win).font(Theme.mono(10.5, .medium)).foregroundStyle(Theme.textTertiary)
             }
             if let tokens = row.tokensText {
                 Text("·").foregroundStyle(Theme.textTertiary)
-                Text(tokens).font(Theme.mono(9)).foregroundStyle(Theme.textTertiary)
-                if let cost = row.costText {
-                    Text(cost).font(Theme.mono(9, .medium)).foregroundStyle(style.color.opacity(0.85))
-                }
+                Text(tokens).font(Theme.mono(10.5)).foregroundStyle(Theme.textTertiary)
             }
-        }
-    }
-
-    @ViewBuilder private var tokenBar: some View {
-        if row.tokens > 0, maxTokens > 0 {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.hairline).frame(height: 2.5)
-                    Capsule().fill(style.color.opacity(0.7))
-                        .frame(width: max(3, geo.size.width * CGFloat(row.tokens) / CGFloat(maxTokens)), height: 2.5)
-                }
-            }
-            .frame(height: 2.5)
-            .padding(.top, 2)
         }
     }
 
