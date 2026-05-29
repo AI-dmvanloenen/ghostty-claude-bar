@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import GhosttyClaudeBarCore
 
 /// The native report window — a dark "mission control" surface listing every
@@ -55,13 +56,22 @@ struct ReportView: View {
 
 private struct HeaderView: View {
     @ObservedObject var monitor: SessionMonitor
+    @State private var now = Date()
+
+    private var accent: Color { StateStyle.dominantColor(for: monitor.rows.map(\.state)) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 9) {
-                Text("Claude Code Sessions")
-                    .font(Theme.display(20, .semibold))
-                    .foregroundStyle(Theme.textPrimary)
+                HStack(spacing: 9) {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .shadow(color: accent.opacity(0.6), radius: 5)
+                    Text("Claude Code Sessions")
+                        .font(Theme.display(19, .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
                 SummaryReadout(monitor: monitor)
             }
             Spacer()
@@ -73,12 +83,14 @@ private struct HeaderView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 18)
+        .padding(.top, 30)     // clear the traffic-light buttons (hidden titlebar)
+        .padding(.bottom, 16)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
     }
 
     private var updatedText: String {
         guard monitor.lastUpdated != .distantPast else { return "—" }
-        let secs = Int(Date().timeIntervalSince(monitor.lastUpdated))
+        let secs = max(0, Int(now.timeIntervalSince(monitor.lastUpdated)))
         if secs < 2 { return "updated just now" }
         if secs < 60 { return "updated \(secs)s ago" }
         return "updated \(secs / 60)m ago"

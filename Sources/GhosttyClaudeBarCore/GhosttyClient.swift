@@ -22,9 +22,34 @@ public enum GhosttyClient {
     end tell
     """
 
-    /// Enumerate all open Ghostty tabs. Empty on any failure (e.g. Ghostty not running).
+    /// One-frame anti-flicker: a transient osascript hiccup (or a watchdog
+    /// termination) can momentarily yield zero tabs while windows are actually
+    /// open. We reuse the last good result for ONE such frame; a genuine
+    /// "all windows closed" (empty twice running) is accepted.
+    private final class Cache: @unchecked Sendable {
+        let lock = NSLock()
+        var lastGood: [GhosttyTab] = []
+        var suppressedFrames = 0
+    }
+    private static let cache = Cache()
+
+    /// Enumerate all open Ghostty tabs.
     public static func tabs() -> [GhosttyTab] {
-        guard let out = Shell.run("/usr/bin/osascript", ["-"], stdin: enumerateScript) else {
+        let parsed = parseTabs()
+
+        cache.lock.lock()
+        defer { cache.lock.unlock() }
+        if parsed.isEmpty, !cache.lastGood.isEmpty, cache.suppressedFrames < 1 {
+            cache.suppressedFrames += 1
+            return cache.lastGood
+        }
+        cache.suppressedFrames = 0
+        cache.lastGood = parsed
+        return parsed
+    }
+
+    private static func parseTabs() -> [GhosttyTab] {
+        guard let out = Shell.run("/usr/bin/osascript", ["-"], stdin: enumerateScript, timeout: 5) else {
             return []
         }
         var result: [GhosttyTab] = []
