@@ -74,6 +74,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         addItem(to: menu, "Open", #selector(openReport), key: "o")
+        addItem(to: menu, "New session…", #selector(newSession), key: "n")
         addItem(to: menu, "Refresh", #selector(refresh), key: "r")
         addItem(to: menu, "Settings…", #selector(openSettings), key: ",")
         menu.addItem(.separator())
@@ -94,6 +95,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     @objc private func refresh() { monitor.refreshAsync() }
+    @objc private func newSession() { SessionLauncher.promptAndLaunch() }
     @objc private func openReport() { onOpenReport() }
     @objc private func openSettings() { onOpenSettings() }
     @objc private func quit() { NSApp.terminate(nil) }

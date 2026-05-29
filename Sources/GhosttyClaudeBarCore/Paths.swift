@@ -28,4 +28,9 @@ public enum Paths {
     public static func collapseHome(_ path: String) -> String {
         path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
+
+    /// Expand a leading `~` back to the home directory.
+    public static func expandHome(_ path: String) -> String {
+        path.hasPrefix("~") ? home + path.dropFirst() : path
+    }
 }

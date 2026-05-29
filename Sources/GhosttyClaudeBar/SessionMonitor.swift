@@ -77,11 +77,35 @@ final class SessionMonitor: ObservableObject {
         return rows
     }
 
+    private var prevStates: [String: SessionState] = [:]
+    private var hasBaseline = false
+
     private func apply(_ rows: [TabRow]) {
+        notifyTransitions(rows)
         self.rows = rows
         self.lastUpdated = Date()
         onUpdate?(self)
         judge.scan() // refine any freshly-finished turns with Haiku
+    }
+
+    /// Fire a native notification when a session newly needs you, or just
+    /// finished. Skips the first load (baseline) so we don't announce everything
+    /// that was already open.
+    private func notifyTransitions(_ rows: [TabRow]) {
+        var next: [String: SessionState] = [:]
+        for r in rows { next[r.id] = r.state }
+        if hasBaseline {
+            for r in rows {
+                guard let prev = prevStates[r.id], prev != r.state else { continue }
+                if r.state == .needsReply {
+                    Notifier.post(title: "Needs reply", subtitle: r.title)
+                } else if r.state == .safeToClose, prev == .working || prev == .needsReply {
+                    Notifier.post(title: "Done", subtitle: r.title)
+                }
+            }
+        }
+        prevStates = next
+        hasBaseline = true
     }
 
     /// Rows grouped by state in display order.

@@ -104,5 +104,15 @@ enum Matcher {
             sessForTerm[t.terminalID] = newest.pid
             used.insert(newest.pid)
         }
+
+        // Round 3: process of elimination. Give any still-unmatched session a
+        // still-unmatched window (in order) so its focus/close/rename actions
+        // work. The label may be approximate, but status is session-driven so it
+        // stays correct. With equal counts this is usually the right pairing.
+        var freeSessions = leftoverSessions.filter { !used.contains($0.pid) }
+        for t in leftoverTabs where sessForTerm[t.terminalID] == nil {
+            guard !freeSessions.isEmpty else { break }
+            sessForTerm[t.terminalID] = freeSessions.removeFirst().pid
+        }
     }
 }

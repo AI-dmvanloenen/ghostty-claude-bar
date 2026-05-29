@@ -9,6 +9,8 @@ struct ReportView: View {
     @ObservedObject var monitor: SessionMonitor
     var onFocus: (String) -> Void
     var onClose: (String) -> Void
+    var onNewSession: () -> Void
+    var onFixName: (TabRow) -> Void
 
     private var dominant: Color {
         StateStyle.dominantColor(for: monitor.rows.map(\.state))
@@ -21,7 +23,7 @@ struct ReportView: View {
         ZStack(alignment: .top) {
             AmbientBackground(accent: dominant)
             VStack(spacing: 0) {
-                HeaderView(monitor: monitor)
+                HeaderView(monitor: monitor, onNewSession: onNewSession)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 content
             }
@@ -41,7 +43,7 @@ struct ReportView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             SectionHeaderView(state: group.state, count: group.rows.count)
                             ForEach(group.rows) { row in
-                                SessionRowView(row: row, onFocus: onFocus, onClose: onClose)
+                                SessionRowView(row: row, onFocus: onFocus, onClose: onClose, onFixName: onFixName)
                                     .transition(.asymmetric(
                                         insertion: .opacity.combined(with: .move(edge: .top)),
                                         removal: .opacity))
@@ -84,7 +86,10 @@ private struct HeaderView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 8) {
-                RefreshButton { monitor.refreshAsync() }
+                HStack(spacing: 8) {
+                    HeaderButton(systemName: "plus", help: "New Claude session…", action: onNewSession)
+                    RefreshButton { monitor.refreshAsync() }
+                }
                 Text(updatedText)
                     .font(Theme.mono(11))
                     .foregroundStyle(Theme.textTertiary)
@@ -95,6 +100,8 @@ private struct HeaderView: View {
         .padding(.bottom, 16)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
     }
+
+    var onNewSession: () -> Void = {}
 
     private var updatedText: String {
         guard monitor.lastUpdated != .distantPast else { return "—" }
@@ -130,6 +137,27 @@ private struct StatusStrip: View {
                 }
             }
         }
+    }
+}
+
+private struct HeaderButton: View {
+    let systemName: String
+    let help: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(hovering ? Theme.textPrimary : Theme.textSecondary)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Theme.card))
+                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }
 
@@ -188,6 +216,7 @@ private struct SessionRowView: View {
     let row: TabRow
     var onFocus: (String) -> Void
     var onClose: (String) -> Void
+    var onFixName: (TabRow) -> Void
 
     @State private var hovering = false
 
@@ -273,10 +302,18 @@ private struct SessionRowView: View {
     }
 
     @ViewBuilder private var actions: some View {
-        HStack(spacing: 10) {
-            // Close button — only when hovering and NOT working (don't interrupt
-            // an active turn). Sends `/close` into the session via Ghostty.
+        HStack(spacing: 11) {
+            // Hover actions — only for matched, non-working sessions (don't
+            // interrupt an active turn, and they need a window to act on).
             if hovering, let id = row.terminalID, row.state != .working {
+                Button { onFixName(row) } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(hex: 0x9B8CFF))
+                }
+                .buttonStyle(.plain)
+                .help("Fix name — let Claude pick a title that fits and /rename to it")
+
                 Button { onClose(id) } label: {
                     Image(systemName: "stop.circle.fill")
                         .font(.system(size: 14))

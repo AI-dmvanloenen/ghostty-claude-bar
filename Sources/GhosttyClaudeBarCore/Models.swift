@@ -28,6 +28,7 @@ public struct TabRow: Sendable, Identifiable {
     /// "W3" or "W3·T2" for multi-tab windows; "—" for orphan sessions; nil for shells.
     public let windowLabel: String?
     public let pid: Int?
+    public let sessionId: String?
     public let status: String?
     public let tokens: Int
     public let tokensText: String?
@@ -46,6 +47,7 @@ public struct TabRow: Sendable, Identifiable {
         terminalID: String? = nil,
         windowLabel: String? = nil,
         pid: Int? = nil,
+        sessionId: String? = nil,
         status: String? = nil,
         tokens: Int = 0,
         tokensText: String? = nil,
@@ -62,6 +64,7 @@ public struct TabRow: Sendable, Identifiable {
         self.terminalID = terminalID
         self.windowLabel = windowLabel
         self.pid = pid
+        self.sessionId = sessionId
         self.status = status
         self.tokens = tokens
         self.tokensText = tokensText

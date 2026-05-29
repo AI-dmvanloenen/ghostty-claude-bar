@@ -24,6 +24,15 @@ final class ReportWindowController: NSObject, NSWindowDelegate {
                         GhosttyClient.focus(terminalID: uuid)
                         GhosttyClient.sendText("/close", toTerminal: uuid)
                     }
+                },
+                onNewSession: { SessionLauncher.promptAndLaunch() },
+                onFixName: { row in
+                    guard let uuid = row.terminalID, let sid = row.sessionId,
+                          let cwd = row.cwd else { return }
+                    Task.detached {
+                        guard let title = NameSuggester.suggest(sessionId: sid, displayCwd: cwd) else { return }
+                        GhosttyClient.sendText("/rename \(title)", toTerminal: uuid)
+                    }
                 }
             )
             let hosting = NSHostingController(rootView: view)

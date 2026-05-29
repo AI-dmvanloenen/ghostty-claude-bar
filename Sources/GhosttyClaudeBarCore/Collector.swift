@@ -84,6 +84,7 @@ public enum Collector {
             terminalID: tab?.terminalID,
             windowLabel: label,
             pid: session.pid,
+            sessionId: session.sessionId,
             status: session.status,
             tokens: usage.tokens,
             tokensText: usage.tokens > 0 ? Usage.fmtTokens(usage.tokens) : nil,

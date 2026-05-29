@@ -93,15 +93,45 @@ public enum GhosttyClient {
         let escaped = text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        let expr = submit ? "(\"\(escaped)\" & return)" : "\"\(escaped)\""
+        // Claude Code submits on the Enter KEY, not a carriage-return character,
+        // so we type the text then send a real `enter` key event.
+        let submitLine = submit
+            ? "\n            delay 0.1\n            send key \"enter\" to theTerm"
+            : ""
         let script = """
         tell application "Ghostty"
           try
-            input text \(expr) to (first terminal whose id is "\(id)")
+            set theTerm to (first terminal whose id is "\(id)")
+            input text "\(escaped)" to theTerm\(submitLine)
           end try
         end tell
         """
         Shell.run("/usr/bin/osascript", ["-e", script])
+    }
+
+    /// Open a new Ghostty window and start `claude` in the given directory.
+    public static func newSession(directory: String) {
+        let dir = directory
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        tell application "Ghostty"
+          activate
+          new window
+          delay 0.5
+          set tid to ""
+          try
+            set tid to id of (focused terminal of (selected tab of front window))
+          end try
+          if tid is not "" then
+            set theTerm to (first terminal whose id is tid)
+            input text "cd \\"\(dir)\\" && claude" to theTerm
+            delay 0.1
+            send key "enter" to theTerm
+          end if
+        end tell
+        """
+        Shell.run("/usr/bin/osascript", ["-e", script], timeout: 10)
     }
 
     /// Terminal UUIDs are hex + dashes, 8–64 chars — never interpolate raw input.
