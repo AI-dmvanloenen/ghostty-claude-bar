@@ -71,3 +71,31 @@ func staleIsSafe() {
                                   lastText: "still chugging along", now: Date())
     #expect(v.state == .safeToClose)
 }
+
+@Test("heuristic state classifies obvious cases")
+func heuristic() {
+    #expect(Recommender.heuristicState(lastText: "Which one do you want?") == "WAITING")
+    #expect(Recommender.heuristicState(lastText: "All set, summary: done.") == "DONE")
+    #expect(Recommender.heuristicState(lastText: "Now editing the file") == "ACTIVE")
+    #expect(Recommender.heuristicState(lastText: nil) == "ACTIVE")
+}
+
+@Test("a fresh WAITING verdict overrides busy (blocked on user mid-turn)")
+func waitingOverridesBusy() {
+    let sid = "gcb-unittest-busy-\(getpid())"
+    defer { try? FileManager.default.removeItem(atPath: VerdictStore.path(for: sid)) }
+
+    let now = Date()
+    // busy session, last activity 10s ago
+    let s = Session(pid: 1, sessionId: sid, cwd: "/tmp/x", status: "busy",
+                    startedAt: (now.timeIntervalSince1970 - 10) * 1000,
+                    updatedAt: (now.timeIntervalSince1970 - 10) * 1000)
+
+    // fresh notification verdict (now) → should override busy
+    VerdictStore.write(sessionId: sid, state: "WAITING", ts: now.timeIntervalSince1970)
+    #expect(Recommender.recommend(session: s, lastText: nil, now: now).state == .needsReply)
+
+    // stale verdict (2 min ago) → busy wins again
+    VerdictStore.write(sessionId: sid, state: "WAITING", ts: now.timeIntervalSince1970 - 120)
+    #expect(Recommender.recommend(session: s, lastText: nil, now: now).state == .working)
+}

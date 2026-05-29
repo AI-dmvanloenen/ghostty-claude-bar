@@ -1,6 +1,17 @@
 import AppKit
 import GhosttyClaudeBarCore
 
+// Claude Code hook entry points — run, write a verdict sidecar, exit. No GUI,
+// no model call (the running app refines Stop verdicts with Haiku).
+if CommandLine.arguments.contains("--stop-hook") {
+    HookRunner.runStopHook()
+    exit(0)
+}
+if CommandLine.arguments.contains("--notify-hook") {
+    HookRunner.runNotificationHook()
+    exit(0)
+}
+
 // Debug path: print the collected rows and exit (no GUI). Handy for verifying
 // the data layer against the real ~/.claude without launching the menu bar.
 if CommandLine.arguments.contains("--print") {

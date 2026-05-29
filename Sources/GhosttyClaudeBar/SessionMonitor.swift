@@ -18,6 +18,13 @@ final class SessionMonitor: ObservableObject {
     private var watcher: FSEventsWatcher?
     private(set) var interval: TimeInterval
 
+    private lazy var judge = JudgeService { [weak self] in self?.refreshAsync() }
+
+    // Coalesce bursts: while a collect runs, extra requests set `pending` and one
+    // trailing collect runs after — so mid-turn FSEvents storms don't thrash.
+    private var refreshing = false
+    private var pending = false
+
     init(interval: TimeInterval) {
         self.interval = interval
     }
@@ -44,11 +51,21 @@ final class SessionMonitor: ObservableObject {
         }
     }
 
-    /// Collect off-main, apply on main.
+    /// Collect off-main, apply on main. Coalesced so overlapping requests don't
+    /// stack up into redundant collects.
     func refreshAsync() {
+        if refreshing { pending = true; return }
+        refreshing = true
         Task.detached(priority: .utility) {
             let rows = Collector.collect()
-            await MainActor.run { self.apply(rows) }
+            await MainActor.run {
+                self.apply(rows)
+                self.refreshing = false
+                if self.pending {
+                    self.pending = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.refreshAsync() }
+                }
+            }
         }
     }
 
@@ -64,6 +81,7 @@ final class SessionMonitor: ObservableObject {
         self.rows = rows
         self.lastUpdated = Date()
         onUpdate?(self)
+        judge.scan() // refine any freshly-finished turns with Haiku
     }
 
     /// Rows grouped by state in display order.

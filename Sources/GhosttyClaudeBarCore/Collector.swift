@@ -16,11 +16,12 @@ public enum Collector {
         }
         let tabs = GhosttyClient.tabs()
 
-        // Read each transcript ONCE (fingerprint + last message + usage together).
+        // Scan each transcript via the cache — only changed files are re-read.
         var scans: [Int: TranscriptScan] = [:]
         for s in sessions {
-            scans[s.pid] = Transcript.scan(path: s.jsonlPath, cwd: s.cwd)
+            scans[s.pid] = TranscriptCache.shared.scan(path: s.jsonlPath, cwd: s.cwd)
         }
+        TranscriptCache.shared.prune(livePaths: Set(sessions.compactMap(\.jsonlPath)))
         let fingerprints = scans.mapValues(\.fingerprint)
 
         // pid → tab, then flip to terminalID → pid for tab-centric assembly.
