@@ -16,13 +16,18 @@ final class StatusItemController {
         rebuild()
     }
 
-    /// Recompute everything from the current row set. Phase 0 uses demo data;
-    /// Phase 1 swaps in the real collector, Phase 3 calls this on a timer +
+    /// Recompute from the real collector off the main thread (AppleScript +
+    /// file I/O), then apply on main. Phase 3 will call this on a timer +
     /// FSEvents + menuWillOpen.
     func rebuild() {
-        let rows = DemoData.demoRows()
-        let needsReply = rows.contains { $0.state == .needsReply }
+        Task.detached(priority: .userInitiated) {
+            let rows = Collector.collect()
+            await MainActor.run { self.apply(rows) }
+        }
+    }
 
+    private func apply(_ rows: [TabRow]) {
+        let needsReply = rows.contains { $0.state == .needsReply }
         if let button = statusItem.button {
             button.image = renderer.statusBarImage(needsReply: needsReply)
             button.imagePosition = .imageLeading
@@ -76,9 +81,8 @@ final class StatusItemController {
     // MARK: - Actions
 
     @objc private func focusRow(_ sender: NSMenuItem) {
-        // Phase 2: `focus terminal whose id is "<uuid>"` via AppleScript.
-        let uuid = sender.representedObject as? String ?? "nil"
-        NSLog("[ghostty-claude-bar] focus row → terminal \(uuid)")
+        guard let uuid = sender.representedObject as? String, !uuid.isEmpty else { return }
+        Task.detached { GhosttyClient.focus(terminalID: uuid) }
     }
 
     @objc private func refresh() {

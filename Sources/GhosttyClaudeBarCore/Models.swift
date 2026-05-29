@@ -19,6 +19,8 @@ public struct TabRow: Sendable, Identifiable {
     /// Human age like "2h", "38s" — nil when unknown.
     public let ageText: String?
     public let state: SessionState
+    /// One-line explanation of the state ("busy — working now", "idle 3.2h"). Tooltip fodder.
+    public let reason: String?
     /// Stable Ghostty terminal UUID, used to focus the window. nil for orphan rows.
     public let terminalID: String?
 
@@ -28,6 +30,7 @@ public struct TabRow: Sendable, Identifiable {
         cwd: String? = nil,
         ageText: String? = nil,
         state: SessionState,
+        reason: String? = nil,
         terminalID: String? = nil
     ) {
         self.id = id
@@ -35,6 +38,7 @@ public struct TabRow: Sendable, Identifiable {
         self.cwd = cwd
         self.ageText = ageText
         self.state = state
+        self.reason = reason
         self.terminalID = terminalID
     }
 
