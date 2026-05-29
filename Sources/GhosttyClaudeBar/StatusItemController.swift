@@ -42,8 +42,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     // MARK: - NSMenuDelegate (fresh-on-open)
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        let rows = monitor.refreshSync()
+        // Populate from cache so the menu opens INSTANTLY. The cache is kept fresh
+        // by FSEvents + the timer, so it's current within ~1s of any change. Only
+        // the very first open (cold cache) pays for a synchronous collect.
+        let rows = monitor.rows.isEmpty ? monitor.refreshSync() : monitor.rows
         populate(menu, with: rows)
+        monitor.refreshAsync() // refresh for the next open + the icon
     }
 
     private func populate(_ menu: NSMenu, with rows: [TabRow]) {

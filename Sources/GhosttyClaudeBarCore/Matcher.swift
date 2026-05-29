@@ -7,12 +7,13 @@ import Foundation
 /// to the Python tool, including the leftover-pairing second pass.
 enum Matcher {
     /// Greedy best-score assignment. Returns sessionPid → matched tab.
-    static func matchWindows(tabs: [GhosttyTab], sessions: [Session]) -> [Int: GhosttyTab] {
+    /// `fingerprints` are precomputed (one transcript read in the collector).
+    static func matchWindows(
+        tabs: [GhosttyTab],
+        sessions: [Session],
+        fingerprints: [Int: String]
+    ) -> [Int: GhosttyTab] {
         guard !tabs.isEmpty, !sessions.isEmpty else { return [:] }
-
-        let fingerprints = Dictionary(uniqueKeysWithValues: sessions.map {
-            ($0.pid, TextAnalysis.fingerprint(jsonlPath: $0.jsonlPath, cwd: $0.cwd))
-        })
 
         // (score, tabIndex, pid), only positive scores.
         var pairs: [(score: Int, tabIndex: Int, pid: Int)] = []

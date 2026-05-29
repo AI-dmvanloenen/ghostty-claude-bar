@@ -77,51 +77,6 @@ enum TextAnalysis {
         }
         return ""
     }
-
-    /// Concatenated lowercased text of user messages (first 400 chars each) +
-    /// assistant messages (first 200) + cwd, for the first ~500 transcript lines.
-    static func fingerprint(jsonlPath: String?, cwd: String) -> String {
-        var parts = [cwd.lowercased()]
-        guard let jsonlPath, let content = try? String(contentsOfFile: jsonlPath, encoding: .utf8) else {
-            return parts.joined(separator: " ")
-        }
-        for (i, line) in content.split(separator: "\n", omittingEmptySubsequences: true).enumerated() {
-            if i > 500 { break }
-            guard let data = line.data(using: .utf8),
-                  let d = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { continue }
-            let type = d["type"] as? String
-            if type == "user" {
-                let text = messageText(d["message"])
-                if !text.isEmpty, !text.hasPrefix("[tool:") {
-                    parts.append(String(text.prefix(400)).lowercased())
-                }
-            } else if type == "assistant" {
-                let text = messageText(d["message"])
-                if !text.isEmpty, !text.hasPrefix("[tool:") {
-                    parts.append(String(text.prefix(200)).lowercased())
-                }
-            }
-        }
-        return parts.joined(separator: " ")
-    }
-
-    /// Last assistant message with readable (non-tool) text. Returns nil if none.
-    static func lastAssistantText(jsonlPath: String?) -> String? {
-        guard let jsonlPath, let content = try? String(contentsOfFile: jsonlPath, encoding: .utf8) else {
-            return nil
-        }
-        let lines = content.split(separator: "\n", omittingEmptySubsequences: true)
-        for line in lines.reversed() {
-            guard let data = line.data(using: .utf8),
-                  let d = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  d["type"] as? String == "assistant"
-            else { continue }
-            let text = messageText(d["message"])
-            if !text.isEmpty, !text.hasPrefix("[tool:") {
-                return text
-            }
-        }
-        return nil
-    }
 }
+// Transcript fingerprint, last-assistant text, and usage are now computed in a
+// single pass — see `Transcript.scan`.

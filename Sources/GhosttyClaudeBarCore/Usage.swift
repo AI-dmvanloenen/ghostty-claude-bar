@@ -26,6 +26,24 @@ public enum Usage {
         return prices.first { model.contains($0.key) }?.rates
     }
 
+    /// Tokens + USD cost for a single assistant `message` dict. `cost` is nil when
+    /// the model isn't priced — callers flag that as `unknown`. Lets a transcript
+    /// be scanned in a single pass (see `Transcript.scan`).
+    static func lineCost(message: [String: Any]) -> (tokens: Int, cost: Double?) {
+        let u = message["usage"] as? [String: Any] ?? [:]
+        let inp = intVal(u["input_tokens"])
+        let cw = intVal(u["cache_creation_input_tokens"])
+        let cr = intVal(u["cache_read_input_tokens"])
+        let out = intVal(u["output_tokens"])
+        let tokens = inp + cw + cr + out
+        guard let r = rates(for: message["model"] as? String) else { return (tokens, nil) }
+        let cost = (Double(inp) * r.input
+                    + Double(cw) * r.cacheWrite
+                    + Double(cr) * r.cacheRead
+                    + Double(out) * r.output) / 1_000_000
+        return (tokens, cost)
+    }
+
     /// Sum billable tokens + USD cost across all assistant turns.
     public static func summarize(jsonlPath: String?) -> Summary {
         guard let jsonlPath, let content = try? String(contentsOfFile: jsonlPath, encoding: .utf8) else {
