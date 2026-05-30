@@ -72,6 +72,23 @@ func staleIsSafe() {
     #expect(v.state == .safeToClose)
 }
 
+@Test("Matcher round-3 elimination binds every session but flags them guessed")
+func eliminationGuessed() {
+    let tabs = [
+        GhosttyTab(window: 1, tab: 1, terminalID: "aaaaaaaa-aaaa", title: "Zzz Unrelated One"),
+        GhosttyTab(window: 2, tab: 1, terminalID: "bbbbbbbb-bbbb", title: "Yyy Unrelated Two"),
+    ]
+    let sessions = [
+        Session(pid: 101, sessionId: "s1", cwd: "/tmp/alpha", status: nil, startedAt: 1, updatedAt: 1),
+        Session(pid: 202, sessionId: "s2", cwd: "/tmp/beta", status: nil, startedAt: 2, updatedAt: 2),
+    ]
+    var sessForTerm: [String: Int] = [:]
+    var guessed: Set<Int> = []
+    Matcher.pairLeftovers(tabs: tabs, sessions: sessions, sessForTerm: &sessForTerm, guessedPids: &guessed)
+    #expect(sessForTerm.count == 2)   // every session still gets a window (focus works)
+    #expect(guessed == [101, 202])    // ...but both are flagged → /close & /rename disabled
+}
+
 @Test("heuristic state classifies obvious cases")
 func heuristic() {
     #expect(Recommender.heuristicState(lastText: "Which one do you want?") == "WAITING")

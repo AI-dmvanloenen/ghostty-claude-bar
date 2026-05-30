@@ -23,6 +23,10 @@ public struct TabRow: Sendable, Identifiable {
     public let reason: String?
     /// Stable Ghostty terminal UUID, used to focus the window. nil for orphan rows.
     public let terminalID: String?
+    /// True when the window↔session match is a low-confidence guess (Matcher's
+    /// process-of-elimination round). Focus is still fine, but destructive actions
+    /// (`/close`, `/rename`) must be disabled — they could hit the wrong session.
+    public let isGuessed: Bool
 
     // Richer fields for the report window (the menu uses only the above).
     /// "W3" or "W3·T2" for multi-tab windows; "—" for orphan sessions; nil for shells.
@@ -45,6 +49,7 @@ public struct TabRow: Sendable, Identifiable {
         state: SessionState,
         reason: String? = nil,
         terminalID: String? = nil,
+        isGuessed: Bool = false,
         windowLabel: String? = nil,
         pid: Int? = nil,
         sessionId: String? = nil,
@@ -62,6 +67,7 @@ public struct TabRow: Sendable, Identifiable {
         self.state = state
         self.reason = reason
         self.terminalID = terminalID
+        self.isGuessed = isGuessed
         self.windowLabel = windowLabel
         self.pid = pid
         self.sessionId = sessionId

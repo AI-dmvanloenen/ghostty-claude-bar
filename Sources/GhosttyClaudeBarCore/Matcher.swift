@@ -65,7 +65,8 @@ enum Matcher {
     static func pairLeftovers(
         tabs: [GhosttyTab],
         sessions: [Session],
-        sessForTerm: inout [String: Int]
+        sessForTerm: inout [String: Int],
+        guessedPids: inout Set<Int>
     ) {
         let matchedPids = Set(sessForTerm.values)
         let leftoverTabs = tabs.filter { sessForTerm[$0.terminalID] == nil }
@@ -112,7 +113,9 @@ enum Matcher {
         var freeSessions = leftoverSessions.filter { !used.contains($0.pid) }
         for t in leftoverTabs where sessForTerm[t.terminalID] == nil {
             guard !freeSessions.isEmpty else { break }
-            sessForTerm[t.terminalID] = freeSessions.removeFirst().pid
+            let pid = freeSessions.removeFirst().pid
+            sessForTerm[t.terminalID] = pid
+            guessedPids.insert(pid) // low-confidence: no /close or /rename
         }
     }
 }
