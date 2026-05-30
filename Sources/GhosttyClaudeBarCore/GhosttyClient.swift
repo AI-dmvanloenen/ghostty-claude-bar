@@ -109,10 +109,9 @@ public enum GhosttyClient {
         Shell.run("/usr/bin/osascript", ["-e", script])
     }
 
-    /// Open a new Ghostty window directly in `directory` and auto-run `claude`.
-    /// Uses a surface configuration so the shell starts in the right cwd (PATH
-    /// loads normally) and `claude` is run via `initial input` — no visible `cd`,
-    /// no Scratch detour.
+    /// Open a new Ghostty window directly in `directory`. We only set the working
+    /// directory — the user's shell/Ghostty config launches `claude` itself (it
+    /// auto-starts in new windows), so injecting `claude` would double it up.
     public static func newSession(directory: String) {
         let dir = directory
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -122,7 +121,6 @@ public enum GhosttyClient {
           activate
           set cfg to new surface configuration
           set initial working directory of cfg to "\(dir)"
-          set initial input of cfg to ("claude" & return)
           new window with configuration cfg
         end tell
         """
