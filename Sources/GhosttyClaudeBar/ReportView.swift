@@ -303,9 +303,11 @@ private struct SessionRowView: View {
 
     @ViewBuilder private var actions: some View {
         HStack(spacing: 11) {
-            // Hover actions — only for matched, non-working sessions (don't
-            // interrupt an active turn, and they need a window to act on).
-            if hovering, let id = row.terminalID, row.state != .working {
+            // Destructive actions (/close, /rename) only for a CONFIDENT, matched,
+            // non-working session. `isGuessed` matches (Matcher elimination round)
+            // could target the wrong window, so they're disabled there — Focus,
+            // which is harmless, stays available.
+            if hovering, let id = row.terminalID, row.state != .working, !row.isGuessed {
                 Button { onFixName(row) } label: {
                     Image(systemName: "sparkles")
                         .font(.system(size: 13))
@@ -326,6 +328,9 @@ private struct SessionRowView: View {
                 Image(systemName: "arrow.up.forward.app.fill")
                     .font(.system(size: 13))
                     .foregroundStyle(hovering ? style.color : Theme.textTertiary.opacity(0.5))
+                    .help(row.isGuessed
+                          ? "Focus (window match uncertain — close/rename disabled)"
+                          : "Click to focus this Ghostty window")
             }
         }
         .padding(.top, 2)

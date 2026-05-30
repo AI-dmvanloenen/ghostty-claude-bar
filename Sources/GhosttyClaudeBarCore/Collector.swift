@@ -31,7 +31,8 @@ public enum Collector {
         let windowForPid = Matcher.matchWindows(tabs: tabs, sessions: sessions, fingerprints: fingerprints)
         var sessForTerm: [String: Int] = [:]
         for (pid, tab) in windowForPid { sessForTerm[tab.terminalID] = pid }
-        Matcher.pairLeftovers(tabs: tabs, sessions: sessions, sessForTerm: &sessForTerm)
+        var guessedPids: Set<Int> = []
+        Matcher.pairLeftovers(tabs: tabs, sessions: sessions, sessForTerm: &sessForTerm, guessedPids: &guessedPids)
 
         var tabByTerm: [String: GhosttyTab] = [:]
         for t in tabs { tabByTerm[t.terminalID] = t }
@@ -53,12 +54,13 @@ public enum Collector {
         let rows = sessions.map { session -> TabRow in
             let tab = tabForPid[session.pid]
             return row(from: session, scan: scans[session.pid], tab: tab,
-                       label: tab.map(windowLabel) ?? "—", now: now)
+                       label: tab.map(windowLabel) ?? "—",
+                       isGuessed: guessedPids.contains(session.pid), now: now)
         }
         return sort(rows)
     }
 
-    private static func row(from session: Session, scan: TranscriptScan?, tab: GhosttyTab?, label: String, now: Date) -> TabRow {
+    private static func row(from session: Session, scan: TranscriptScan?, tab: GhosttyTab?, label: String, isGuessed: Bool = false, now: Date) -> TabRow {
         let lastText = scan?.lastAssistantText
         let verdict = Recommender.recommend(session: session, lastText: lastText, now: now)
         let ageH = session.ageHours(now: now)
@@ -82,6 +84,7 @@ public enum Collector {
             state: verdict.state,
             reason: verdict.reason,
             terminalID: tab?.terminalID,
+            isGuessed: isGuessed,
             windowLabel: label,
             pid: session.pid,
             sessionId: session.sessionId,
